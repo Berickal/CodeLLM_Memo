@@ -1,0 +1,191 @@
+import sys, os, json, pandas
+from datasets import load_dataset
+from tqdm import tqdm
+import perturbation as p
+
+def save_data(data, output):
+    with open(output, 'w') as f:
+        json.dump(data, f)
+
+
+##----------------------------Code Synthesis Benchmark------------------------##
+
+def load_xlcost(output):
+    subsets = ["C++-program-level", "Python-program-level", "Java-program-level", "Javascript-program-level", "Csharp-program-level", "C++-program-level",
+         "PHP-program-level", "C++-snippet-level", "Python-snippet-level", "Java-snippet-level", "Javascript-snippet-level", "Csharp-snippet-level", "C++-snippet-level",
+         "PHP-snippet-level"]
+    df = pandas.DataFrame()
+    for fol in subsets:
+        ds = load_dataset("codeparrot/xlcost-text-to-code", fol, split="train")
+        df_ = ds.to_pandas()
+        df_ = df_[df_['text'].str.len() > 150]
+        df_ = df_.sample(50, ignore_index=True)
+        df = pandas.concat([df, df_], ignore_index=True)
+    for idx, row in tqdm(df.iterrows()):
+        data = {'text' : row['text'], 'ref' : row['code'], 'pert' : p.pertubation_nl(row['text'], 5)}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+
+def load_code_contest(output):
+    ds = load_dataset("deepmind/code_contests", split='train')
+    df = ds.to_pandas()
+    df = df.sample(frac=1, ignore_index=True)
+    # Fix it - There are different language here
+    for idx, row in tqdm(df.iterrows()):
+        data = {'text' : row['text'], 'ref' : row['code'], 'pert' : p.pertubation_nl(row['text'], 5)}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+
+def load_apps(output):
+    ds = load_dataset("codeparrot/apps", split='train')
+    df = ds.to_pandas()
+    df = df.sample(frac=1, ignore_index=True)
+    for idx, row in tqdm(df.iterrows()):
+        data = {'text' : row['question'], 'ref' : json.loads(row['solutions'])[0], 'pert' : p.pertubation_nl(row['question'], 5)}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+
+def load_mbpp(output):
+    ds = load_dataset("mbpp", split='train')
+    df = ds.to_pandas()
+    df = df.sample(frac=1, ignore_index=True)
+    for idx, row in tqdm(df.iterrows()):
+        data = {'text' : row['text'], 'ref' : row['code'], 'pert' : p.pertubation_nl(row['text'], 5)}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+def load_lbpp(output):
+    ds = load_dataset("CohereForAI/lbpp", split='test')
+    df = ds.to_pandas()
+    df = df.sample(frac=1, ignore_index=True)
+    for idx, row in tqdm(df.iterrows()):
+        data = {'text' : row['instruction'], 'ref' : row['completion'], 'pert' : p.pertubation_nl(row['instruction'], 5)}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+def load_human_eval(output):
+    ds = load_dataset("openai/openai_humaneval", split='test')
+    df = ds.to_pandas()
+    df = df.sample(frac=1, ignore_index=True)
+    for idx, row in tqdm(df.iterrows()):
+        data = {'text' : row['prompt'], 'ref' : row['canonical_solution'], 'pert' : p.pertubation_nl(row['prompt'], 5)}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+
+##----------------------------Vulnerabilities Detection Benchmark------------------------##
+
+def load_vuldetect(output):
+    #Don't forget the credit
+    df = pandas.read_json('./raw/VulDetectBench.jsonl', lines=True)
+    for idx, row in tqdm(df.iterrows()):
+        data = {'text' : row['code'], 'pert' : p.pertubation_code(row['text'], language='c', max_pert=5)}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+def load_cve_fixes(output):
+    return None
+
+def load_vulnpatchpairs(output):
+    df = pandas.read_json('./raw/VulnPatchPairs.jsonl', lines=True)
+    for idx, row in tqdm(df.iterrows()):
+        data = {'text' : row['code'], 'pert' : p.pertubation_code(row['text'], language='c', max_pert=5)}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+def load_diversevul(output):
+    ds = load_dataset("claudios/DiverseVul", split='test')
+    df = ds.to_pandas()
+    df = df[df['target'] == 1].sample(frac=1, ignore_index=True)
+    for idx, row in tqdm(df.iterrows()):
+        data = {'text' : row['prompt'], 'ref' : row['message'], 'pert' : p.pertubation_code(row['prompt'], language='c', max_pert=5)}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+def load_devign(output):
+    ds = load_dataset("DetectVul/devign", split='train')
+    df = ds.to_pandas()
+    df = df[df['target'] == True].sample(frac=1, ignore_index=True)
+    for idx, row in tqdm(df.iterrows()):
+        data = {'text' : row['func'], 'pert' : p.pertubation_code(row['prompt'], language='c', max_pert=5)}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+def load_reveal(output):
+    return None
+
+##----------------------------Program Repair Benchmark------------------------##
+def load_defects4j(output):
+    return None
+
+
+def load_condefect(output):
+    ds = load_dataset("xin1997/condefects-python_all_only_input", split="train")
+    df = ds.to_pandas()
+    for idx, row in tqdm(df.iterrows()):
+        code = p.pertubation_code(row['prompt'], language='c', max_pert=5)
+        buggy_code, fixed_code = [], []
+        for c in code:
+            l_ = c['prompt'].splitlines()[0]
+            buggy_code.append(l_ + c.split(l_)[1])
+            fixed_code.append(c['prompt'].replace(buggy_code, ''))
+        data = {'text' : buggy_code[0]['prompt'], 'ref' : fixed_code[0]['prompt'], 'pert' : buggy_code}
+        save_data(data)
+
+def load_quixbugs(output):
+    ds = load_dataset("Muennighoff/quixbugs", split='train')
+    df = ds.to_pandas()
+    df = df.sample(frac=1, ignore_index=True)
+    for idx, row in tqdm(df.iterrows()):
+        lang = 'python' if 'def ' in row['buggy_program'] else 'java'
+        data = {'text' : row['buggy_program'], 'ref' : row['solution'], 'pert' : p.pertubation_code(row['prompt'], language=lang, max_pert=5)}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+
+##----------------------------Code Summarization Benchmark------------------------##
+
+def load_codesearchnet(output):
+    ds = load_dataset("code-search-net/code_search_net", split="train")
+    df = ds.to_pandas()
+    df_python = df[df['language'] == 'python']
+    df_java = df[df['language'] == 'java']
+    df_js = df[df['language'] == 'javascript']
+    df_all = pandas.concat([df_python, df_java, df_js], ignore_index=True)
+    df_all = df_all.sample(frac=1, ignore_index=True)
+    for idx, row in tqdm(df_all.iterrows()):
+        data = {'text' : row['func_code_string'], 'ref' : row['func_documentation_string'], 'pert' : p.pertubation_code(row['prompt'], language=row['language'], max_pert=5)}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+def load_tlcodesum(output):
+    return None
+
+##----------------------------Test Generation------------------------##
+def load_testeval(output):
+    df = pandas.read_json("raw/TestEval.jsonl'") 
+    df = df.sample(frac=1, ignore_index=True)
+    for idx, row in tqdm(df.iterrows()):
+        pert = p.pertubation_code(row['python_solution'], language='python', max_pert=5)
+        for p_ in pert:
+            fn = p.func_name(p_['prompt'])
+            p_['prompt'] = p.build_test_prompt(fn, p_['prompt'], row['description'])
+        data = {'text' : row['python_solution'], 'pert' : pert}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+def load_bigcodebench(output):
+    ds = load_dataset("bigcode/bigcodebench", split="v0.1.0_hf")
+    df = ds.to_pandas()
+    df = df.sample(frac=1, ignore_index=True)
+    for idx, row in tqdm(df.iterrows()):
+        pert = p.pertubation_code(row['complete_prompt'] + row['canonical_solution'], language='python', max_pert=5)
+        for p_ in pert:
+            fn = p.func_name(p_['prompt'])
+            p_['prompt'] = p.build_test_prompt(fn, p_['prompt'], row['instruct_prompt'])
+        data = {'text' : row['complete_prompt'] + row['canonical_solution'], 'ref' : row['test'], 'pert' : pert}
+        save_data(data, f'{output}/sample_{idx}.json')
+
+
+def load_quixbugs(output):
+    ds = load_dataset("Muennighoff/quixbugs", split="train")
+    df = ds.to_pandas()
+    df = df.sample(frac=1, ignore_index=True)
+    for idx, row in tqdm(df.iterrows()):
+        lang = 'python' if 'def ' in row['solution'] else 'java'
+        pert = p.pertubation_code(row['solution'], language=lang, max_pert=5)
+        for p_ in pert:
+            fn = p.func_name(p_['prompt'])
+            p_['prompt'] = p.build_test_prompt(fn, p_['prompt'], row['description'])
+        data = {'text' : row['solution'], 'pert' : pert}
+        save_data(data, f'{output}/sample_{idx}.json')
