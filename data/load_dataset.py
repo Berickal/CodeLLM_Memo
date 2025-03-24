@@ -1,4 +1,4 @@
-import sys, os, json, pandas
+import sys, os, json, pandas, argparse, logging
 from datasets import load_dataset
 from tqdm import tqdm
 import perturbation as p
@@ -80,7 +80,17 @@ def load_vuldetect(output):
         save_data(data, f'{output}/sample_{idx}.json')
 
 def load_cve_fixes(output):
-    return None
+    ds = load_dataset("euisuh15/cveFixes1")
+    folder = ["c", "java", "python"]
+    df = pandas.DataFrame()
+    for fol in folder:
+        ds = load_dataset("euisuh15/cveFixes1", split=fol)
+        df_ = ds.to_pandas()
+        df_['lang'] = fol
+        df = pandas.concat([df, df_], ignore_index=True)
+    for idx, row in tqdm(df.iterrows()):
+        data = {'text' : row['func_before'], 'pert' : p.pertubation_code(row['func_before'], row['lang'], 5)}
+        save_data(data, f'{output}/sample_{idx}.json')
 
 def load_vulnpatchpairs(output):
     df = pandas.read_json('./raw/VulnPatchPairs.jsonl', lines=True)
@@ -125,7 +135,7 @@ def load_condefect(output):
         data = {'text' : buggy_code[0]['prompt'], 'ref' : fixed_code[0]['prompt'], 'pert' : buggy_code}
         save_data(data)
 
-def load_quixbugs(output):
+def load_quixbugs_pr(output):
     ds = load_dataset("Muennighoff/quixbugs", split='train')
     df = ds.to_pandas()
     df = df.sample(frac=1, ignore_index=True)
@@ -177,7 +187,7 @@ def load_bigcodebench(output):
         save_data(data, f'{output}/sample_{idx}.json')
 
 
-def load_quixbugs(output):
+def load_quixbugs_tg(output):
     ds = load_dataset("Muennighoff/quixbugs", split="train")
     df = ds.to_pandas()
     df = df.sample(frac=1, ignore_index=True)
@@ -189,3 +199,116 @@ def load_quixbugs(output):
             p_['prompt'] = p.build_test_prompt(fn, p_['prompt'], row['description'])
         data = {'text' : row['solution'], 'pert' : pert}
         save_data(data, f'{output}/sample_{idx}.json')
+
+
+def load_code_synthesis(output : str):
+    load_xlcost(f'{output}/xlcost/')
+    load_apps(f'{output}/apps/')
+    load_human_eval(f'{output}/human_eval/')
+    load_code_contest(f'{output}/codecontest/')
+    load_lbpp(f'{output}/lbpp/')
+    load_mbpp(f'{output}/mbpp/')
+
+def load_vulnerability_detection(output : str):
+    load_vulnpatchpairs(f'{output}/vulpatchpairs/')
+    load_vuldetect(f'{output}/vuldetect/')
+    load_devign(f'{output}/devign/')
+    load_reveal(f'{output}/reveal/')
+    load_diversevul(f'{output}/diversevul/')
+    load_cve_fixes(f'{output}/cve_fixes/')
+
+def load_program_repair(output : str):
+    load_quixbugs_pr(f'{output}/quixbugs/')
+    load_defects4j(f'{output}/defects4j/')
+    load_condefect(f'{output}/condefect/')
+
+def load_code_summarization(output : str):
+    load_codesearchnet(f'{output}/codesearchnet/')
+    load_tlcodesum(f'{output}/tlcodesum/')
+
+def load_test_generation(output : str):
+    load_testeval(f'{output}/testeval/')
+    load_bigcodebench(f'{output}/bigcodebench/')
+    load_quixbugs_tg(f'{output}/quixbugs/')
+
+
+def load_by_dataset(dataset : str, output : str):
+    if dataset == 'xlcost':
+        load_xlcost(output)
+    elif dataset == 'human_eval':
+        load_human_eval(output)
+    elif dataset == 'lbpp':
+        load_lbpp(output)
+    elif dataset == 'mbpp':
+        load_mbpp(output)
+    elif dataset == 'codecontest':
+        load_code_contest(output)
+    elif dataset == 'apps':
+        load_apps(output)
+
+
+    elif dataset == 'test_eval':
+        load_testeval(output)
+    elif dataset == 'bigcodebench':
+        load_bigcodebench(output)
+    elif dataset == 'bigcodebench':
+        load_bigcodebench(output)
+
+
+    elif dataset == 'cve_fixes':
+        load_cve_fixes(output)
+    elif dataset == 'vulnpatchpair':
+        load_vulnpatchpairs(output)
+    elif dataset == 'vuldetectbench':
+        load_vuldetect(output)
+    elif dataset == 'diversevul':
+        load_diversevul(output)
+    elif dataset == 'devign':
+        load_devign(output)
+    elif dataset == 'reveal':
+        load_reveal(output)
+
+    elif dataset == 'quixbugs_pr':
+        load_quixbugs_pr(dataset)
+    elif dataset == 'defects4j':
+        load_defects4j(output)
+    elif dataset == 'condefects':
+        load_condefect(output)
+
+    elif dataset == 'codesearchnet':
+        load_codesearchnet(output)
+    elif dataset == 'tl_codesum':
+        load_tlcodesum(output)
+
+
+def load(dataset, task, output):
+    if(dataset == None and task == None):
+        logging.warning("Missing parameters")
+
+    elif task in ["cg", "code_synthesis"]:
+        load_code_synthesis(output)
+
+    elif task in ["vd", "vulnerability_detection"]:
+        load_vulnerability_detection(output)
+
+    elif task in ["pr", "program_repair"]:
+        load_program_repair(output)
+
+    elif task in ["cs", "code_summarization"]:
+        load_code_summarization(output)
+
+    elif task in ["tg", "test_generation"]:
+        load_test_generation(output)
+
+    elif dataset != None:
+        load_by_dataset(dataset, output)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", type=str)
+    parser.add_argument("--task", type=str)
+    parser.add_argument("--output", type=str)
+
+    args = parser.parse_args()
+    dataset, task, output = parser.dataset, parser.task, parser.output
+    load(dataset, task, output)

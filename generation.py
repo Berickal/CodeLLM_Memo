@@ -1,4 +1,4 @@
-import ollama, tqdm, pandas, os, json, re, time
+import ollama, tqdm, pandas, os, json, re, time, argparse
 from utils import get_data, clean_code
 
 def get_instruction(key):
@@ -32,3 +32,18 @@ def generate(model : str, folder : str, output : str, task : str = 'cg', max_ite
             p['gen'] = rs
         with open(f'{output}{file}', 'w') as nf:
             json.dump(data, nf)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=str)
+    parser.add_argument("--folder", type=str)
+    parser.add_argument("--task", type=str)
+    parser.add_argument("--output", type=str)
+    parser.add_argument("--iteration", type=int, default=3)
+
+    args = parser.parse_args()
+
+    fol, task, out, iter, model = args.folder, args.task, args.output, args.iteration, args.model
+    generate(model, fol, out, task, iter)
+    
