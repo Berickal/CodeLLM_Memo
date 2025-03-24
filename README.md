@@ -10,6 +10,8 @@ To set up the environment, install the required dependencies:
 pip install -r requirements.txt
 ```
 
+PS : For the generation phase, we recommend the installation of Ollama. Further details <a href="https://ollama.com/download">here</a>
+
 ## Usage
 
 ### Default Pipeline
