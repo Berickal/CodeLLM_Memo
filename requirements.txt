@@ -1,0 +1,11 @@
+textdistance==4.5.0
+numpy==1.23.5
+rouge-score==0.1.2
+tqdm==4.64.1
+matplotlib==3.6.2
+datasets==2.10.1
+transformers==4.26.1
+tree-sitter==0.20.1
+tree-sitter-languages==1.0.0
+pandas==1.5.2
+ollama==0.1.0
